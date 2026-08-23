@@ -1,69 +1,106 @@
-import Image from "next/image";
+'use client';
+
+import { useState } from 'react';
+import SearchForm, { SearchParams } from '@/components/SearchForm';
+import JobResults from '@/components/JobResults';
+
+interface Job {
+  title: string;
+  company: string;
+  location: string;
+  posted_date: string;
+  job_type: string;
+  is_remote: boolean;
+  job_url: string;
+  min_amount?: number;
+  max_amount?: number;
+  currency?: string;
+  description?: string;
+}
 
 export default function Home() {
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searchPerformed, setSearchPerformed] = useState(false);
+
+  const handleSearch = async (params: SearchParams) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Call the FastAPI backend
+      const response = await fetch('http://localhost:8000/api/v1/search_jobs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'f7099592-194f-40fd-9f11-5d04f759a1e4', // TODO: Move to env variable
+        },
+        body: JSON.stringify({
+          search_term: params.search_term,
+          location: params.location,
+          distance: params.distance,
+          country_indeed: params.country_indeed,
+          results_wanted: params.results_wanted,
+          job_type: params.job_type || undefined,
+          is_remote: params.is_remote || undefined,
+          site_name: params.site_names,
+          enforce_annual_salary: true,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.detail || 'Failed to fetch jobs. Please try again.'
+        );
+      }
+
+      const data = await response.json();
+      setJobs(data.jobs || []);
+      setSearchPerformed(true);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'An error occurred';
+      setError(message);
+      console.error('Search error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Header */}
+      <header className="bg-white shadow">
+        <div className="max-w-6xl mx-auto px-4 py-6">
+          <h1 className="text-3xl font-bold text-gray-900">JobSpy Dashboard</h1>
+          <p className="text-gray-600 mt-1">
+            Search jobs across multiple platforms
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </header>
+
+      {/* Main Content */}
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <SearchForm onSearch={handleSearch} isLoading={isLoading} />
+
+        <div className="mt-8">
+          {searchPerformed && (
+            <JobResults jobs={jobs} isLoading={isLoading} error={error || undefined} />
+          )}
         </div>
-      </main>
-    </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="bg-white border-t border-gray-200 mt-12">
+        <div className="max-w-6xl mx-auto px-4 py-6 text-center text-sm text-gray-600">
+          <p>
+            Make sure the JobSpy API is running on localhost:8000 before
+            searching
+          </p>
+        </div>
+      </footer>
+    </main>
   );
 }
